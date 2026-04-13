@@ -24,61 +24,62 @@
   .loading .spinner{display:inline-block;width:28px;height:28px;border:2px solid rgba(255,200,100,.1);border-top-color:rgba(255,200,100,.5);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:16px}
   @keyframes spin{to{transform:rotate(360deg)}}
 
-  .results{display:none;padding:20px 28px}
+  .results{display:none;padding:28px 36px;max-width:1200px;margin:0 auto}
   .results.show{display:block}
+  @media(max-width:600px){.results{padding:16px}}
 
   /* KPI Cards */
-  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:24px}
-  .kpi{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);border-radius:12px;padding:16px 20px;text-align:center}
-  .kpi-val{font-size:28px;font-weight:600;color:rgba(255,200,100,.7);font-variant-numeric:tabular-nums}
-  .kpi-label{font-size:9px;letter-spacing:2px;color:rgba(255,255,255,.2);text-transform:uppercase;margin-top:4px}
-  .kpi-green .kpi-val{color:rgba(100,255,150,.7)}
-  .kpi-red .kpi-val{color:rgba(255,100,100,.7)}
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px}
+  @media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:500px){.kpis{grid-template-columns:1fr}}
+  .kpi{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:16px;padding:24px;text-align:center}
+  .kpi-val{font-size:32px;font-weight:700;color:rgba(255,200,100,.8);font-variant-numeric:tabular-nums;line-height:1.1}
+  .kpi-label{font-size:10px;letter-spacing:2px;color:rgba(255,255,255,.25);text-transform:uppercase;margin-top:8px}
+  .kpi-green .kpi-val{color:rgba(100,255,150,.8)}
+  .kpi-red .kpi-val{color:rgba(255,120,120,.8)}
 
   /* Savings banner */
-  .savings-banner{background:linear-gradient(135deg,rgba(255,200,100,.06),rgba(100,255,150,.04));border:1px solid rgba(255,200,100,.15);border-radius:14px;padding:24px;text-align:center;margin-bottom:24px}
-  .savings-big{font-size:48px;font-weight:700;color:rgba(255,200,100,.8)}
-  .savings-sub{font-size:13px;color:rgba(255,255,255,.25);margin-top:4px}
-  .savings-action{margin-top:14px;display:inline-block;background:rgba(255,200,100,.1);border:1px solid rgba(255,200,100,.25);color:rgba(255,200,100,.8);font-size:12px;letter-spacing:2px;padding:10px 28px;border-radius:24px;cursor:pointer;font-family:inherit;text-decoration:none;text-transform:uppercase;transition:all .2s}
-  .savings-action:hover{background:rgba(255,200,100,.2)}
+  .savings-banner{background:linear-gradient(135deg,rgba(255,200,100,.05) 0%,rgba(100,255,150,.03) 100%);border:1px solid rgba(255,200,100,.12);border-radius:20px;padding:36px 24px;text-align:center;margin-bottom:32px}
+  .savings-big{font-size:56px;font-weight:700;color:rgba(255,200,100,.85);line-height:1}
+  .savings-sub{font-size:14px;color:rgba(255,255,255,.3);margin-top:8px;font-weight:300}
+  .savings-action{margin-top:18px;display:inline-block;background:rgba(255,200,100,.1);border:1px solid rgba(255,200,100,.25);color:rgba(255,200,100,.8);font-size:12px;letter-spacing:3px;padding:12px 32px;border-radius:30px;cursor:pointer;font-family:inherit;text-decoration:none;text-transform:uppercase;transition:all .2s;font-weight:500}
+  .savings-action:hover{background:rgba(255,200,100,.2);transform:translateY(-1px)}
 
   /* Sections */
-  .section{margin-bottom:28px}
-  .section-title{font-size:10px;letter-spacing:3px;color:rgba(255,255,255,.1);text-transform:uppercase;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.03)}
+  .section{margin-bottom:36px}
+  .section-title{font-size:11px;letter-spacing:3px;color:rgba(255,255,255,.15);text-transform:uppercase;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.04);font-weight:500}
 
   /* Treemap */
-  .treemap{display:flex;flex-wrap:wrap;gap:3px;min-height:200px}
-  .tree-cell{border-radius:6px;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:6px;overflow:hidden;cursor:default;transition:opacity .2s;min-width:30px;min-height:30px}
-  .tree-cell:hover{opacity:.8}
-  .tree-name{font-size:8px;color:rgba(255,255,255,.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-  .tree-size{font-size:7px;color:rgba(255,255,255,.4)}
+  .treemap{display:flex;flex-wrap:wrap;gap:4px;min-height:280px;padding:8px;background:rgba(255,255,255,.01);border:1px solid rgba(255,255,255,.03);border-radius:14px}
+  .tree-cell{border-radius:8px;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:10px 8px;overflow:hidden;cursor:default;transition:all .2s;min-width:60px;min-height:60px}
+  .tree-cell:hover{transform:scale(1.03);z-index:1}
+  .tree-name{font-size:10px;font-weight:500;color:rgba(255,255,255,.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;text-align:center}
+  .tree-size{font-size:9px;color:rgba(255,255,255,.45);margin-top:2px}
 
   /* Tables */
-  .tbl{width:100%;border-collapse:collapse;font-size:11px}
-  .tbl th{text-align:left;font-size:9px;letter-spacing:1px;color:rgba(255,255,255,.15);text-transform:uppercase;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.04)}
-  .tbl td{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.02);color:rgba(255,255,255,.35)}
-  .tbl tr:hover td{color:rgba(255,255,255,.6)}
-  .tbl .num{text-align:right;font-variant-numeric:tabular-nums}
-  .tbl .bar-cell{width:120px}
-  .mini-bar{height:4px;border-radius:2px;background:rgba(255,200,100,.15)}
-  .mini-bar-fill{height:100%;border-radius:2px;background:rgba(255,200,100,.5)}
+  .tbl{width:100%;border-collapse:collapse;font-size:12px}
+  .tbl th{text-align:left;font-size:9px;letter-spacing:2px;color:rgba(255,255,255,.2);text-transform:uppercase;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.05)}
+  .tbl td{padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.02);color:rgba(255,255,255,.4)}
+  .tbl tr:hover td{color:rgba(255,255,255,.7);background:rgba(255,255,255,.01)}
+  .tbl .num{text-align:right;font-variant-numeric:tabular-nums;font-weight:500}
 
   /* Dupe cards */
-  .dupe-card{background:rgba(255,100,100,.02);border:1px solid rgba(255,100,100,.08);border-radius:10px;padding:12px 16px;margin-bottom:8px}
-  .dupe-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
-  .dupe-waste{font-size:13px;font-weight:600;color:rgba(255,100,100,.6)}
-  .dupe-count{font-size:9px;color:rgba(255,255,255,.15);letter-spacing:1px}
-  .dupe-files{font-size:10px;color:rgba(255,255,255,.2);line-height:1.6;word-break:break-all}
+  .dupe-card{background:rgba(255,100,100,.02);border:1px solid rgba(255,100,100,.1);border-radius:12px;padding:16px 20px;margin-bottom:10px;transition:border-color .2s}
+  .dupe-card:hover{border-color:rgba(255,100,100,.2)}
+  .dupe-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .dupe-waste{font-size:15px;font-weight:700;color:rgba(255,120,120,.7)}
+  .dupe-count{font-size:10px;color:rgba(255,255,255,.2);letter-spacing:1px}
+  .dupe-files{font-size:11px;color:rgba(255,255,255,.25);line-height:1.7;word-break:break-all}
 
-  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
-  @media(max-width:800px){.grid-2{grid-template-columns:1fr}}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:32px}
+  @media(max-width:900px){.grid-2{grid-template-columns:1fr}}
 
   /* Type bar chart */
-  .type-row{display:flex;align-items:center;gap:10px;margin-bottom:6px}
-  .type-ext{font-size:10px;color:rgba(255,255,255,.3);min-width:60px;text-align:right}
-  .type-bar{flex:1;height:16px;background:rgba(255,255,255,.02);border-radius:4px;overflow:hidden;position:relative}
-  .type-fill{height:100%;border-radius:4px;transition:width .5s}
-  .type-meta{font-size:9px;color:rgba(255,255,255,.15);min-width:80px}
+  .type-row{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+  .type-ext{font-size:12px;color:rgba(255,255,255,.4);min-width:70px;text-align:right;font-weight:500}
+  .type-bar{flex:1;height:22px;background:rgba(255,255,255,.02);border-radius:6px;overflow:hidden;position:relative}
+  .type-fill{height:100%;border-radius:6px;transition:width .6s ease}
+  .type-meta{font-size:10px;color:rgba(255,255,255,.2);min-width:100px;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -199,22 +200,30 @@ function renderResults(d) {
     fmtB(d.totalSize) + ' → ' + fmtB(d.vaultEstimate.estimatedVaultSize) +
     ' (save ' + fmtB(d.vaultEstimate.estimatedSavings) + ')';
 
-  // Treemap
+  // Treemap — proportional sized cells
   const treemap = document.getElementById('treemap');
   treemap.innerHTML = '';
-  const maxDir = d.dirTree.length ? d.dirTree[0].size : 1;
-  d.dirTree.slice(0, 40).forEach((dir, i) => {
+  const topDirs = d.dirTree.slice(0, 25).filter(dir => (dir.size / d.totalSize) * 100 >= 0.3);
+
+  topDirs.forEach((dir, i) => {
     const pct = (dir.size / d.totalSize) * 100;
-    if (pct < 0.5) return;
     const cell = document.createElement('div');
     cell.className = 'tree-cell';
-    const area = Math.max(40, Math.sqrt(pct) * 50);
+    // Scale: sqrt of percentage for area, with generous minimums
+    const area = Math.max(80, Math.sqrt(pct) * 70);
     cell.style.width = area + 'px';
     cell.style.height = area + 'px';
-    cell.style.background = COLORS[i % COLORS.length] + '20';
-    cell.style.border = '1px solid ' + COLORS[i % COLORS.length] + '30';
-    cell.title = dir.dir + '\n' + fmtB(dir.size) + ' (' + dir.pct + '%)';
-    cell.innerHTML = '<div class="tree-name">' + esc(dir.dir === '.' ? '(root)' : dir.dir) + '</div><div class="tree-size">' + fmtB(dir.size) + '</div>';
+    cell.style.background = COLORS[i % COLORS.length] + '18';
+    cell.style.border = '1px solid ' + COLORS[i % COLORS.length] + '35';
+
+    const dirName = dir.dir === '.' ? '(root)' : dir.dir.split('/').pop();
+    const fullPath = dir.dir === '.' ? '(root files)' : dir.dir;
+    cell.title = fullPath + '\n' + fmtB(dir.size) + ' (' + dir.pct + '%)';
+
+    cell.innerHTML =
+      '<div class="tree-name">' + esc(dirName) + '</div>' +
+      '<div class="tree-size">' + fmtB(dir.size) + '</div>' +
+      '<div class="tree-size" style="opacity:.5">' + dir.pct + '%</div>';
     treemap.appendChild(cell);
   });
 
