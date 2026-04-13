@@ -1,0 +1,6 @@
+node_modules/
+.vault/
+vault.key
+*.log
+.DS_Store
+.test-vault-*

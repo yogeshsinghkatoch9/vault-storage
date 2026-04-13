@@ -1,0 +1,49 @@
+{
+  "name": "vault-storage",
+  "version": "1.0.0",
+  "description": "Content-addressable storage engine with CDC chunking, smart compression, dedup, encryption, P2P sync, and a web UI. Zero dependencies.",
+  "main": "src/engine.js",
+  "bin": {
+    "vault": "bin/vault"
+  },
+  "scripts": {
+    "test": "node test.js",
+    "start": "node bin/vault serve"
+  },
+  "keywords": [
+    "storage",
+    "dedup",
+    "deduplication",
+    "compression",
+    "vault",
+    "content-addressable",
+    "chunking",
+    "cdc",
+    "backup",
+    "encryption",
+    "aes-256-gcm",
+    "p2p",
+    "sync",
+    "cli",
+    "zero-dependencies"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yogeshsinghkatoch9/vault-storage"
+  },
+  "homepage": "https://github.com/yogeshsinghkatoch9/vault-storage#readme",
+  "bugs": {
+    "url": "https://github.com/yogeshsinghkatoch9/vault-storage/issues"
+  },
+  "author": "Yogesh Singh Katoch",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "README.md",
+    "LICENSE"
+  ]
+}

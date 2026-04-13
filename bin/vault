@@ -1,0 +1,370 @@
+#!/usr/bin/env node
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+const Vault = require('../src/engine');
+
+// ─── ANSI Colors ──────────────────────────────────────────────────────
+const c = {
+  r: '\x1b[0m',
+  d: '\x1b[2m',
+  b: '\x1b[1m',
+  g: '\x1b[32m',
+  y: '\x1b[33m',
+  red: '\x1b[31m',
+  cy: '\x1b[36m',
+  mg: '\x1b[35m',
+};
+const dot = `${c.y}\u25C6${c.r}`;
+
+// ─── Formatting ───────────────────────────────────────────────────────
+function fmtBytes(b) {
+  if (b == null || isNaN(b)) return '0 B';
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+  if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB';
+  if (b < 1099511627776) return (b / 1073741824).toFixed(2) + ' GB';
+  return (b / 1099511627776).toFixed(2) + ' TB';
+}
+
+function fmtTime(ms) {
+  if (ms < 1) return ms.toFixed(3) + ' ms';
+  if (ms < 1000) return ms.toFixed(1) + ' ms';
+  if (ms < 60000) return (ms / 1000).toFixed(2) + ' s';
+  return (ms / 60000).toFixed(1) + ' min';
+}
+
+function fmtDate(ts) {
+  return new Date(ts).toISOString().replace('T', ' ').slice(0, 19);
+}
+
+// ─── Argument Parsing ─────────────────────────────────────────────────
+const rawArgs = process.argv.slice(2);
+const flags = {};
+const positional = [];
+
+for (let i = 0; i < rawArgs.length; i++) {
+  if (rawArgs[i] === '--dir' && rawArgs[i + 1]) {
+    flags.dir = rawArgs[++i];
+  } else if (rawArgs[i] === '--out' && rawArgs[i + 1]) {
+    flags.out = rawArgs[++i];
+  } else if (rawArgs[i] === '--as' && rawArgs[i + 1]) {
+    flags.as = rawArgs[++i];
+  } else if ((rawArgs[i] === '--password' || rawArgs[i] === '-p') && rawArgs[i + 1]) {
+    flags.password = rawArgs[++i];
+  } else if (rawArgs[i].startsWith('--')) {
+    flags[rawArgs[i].slice(2)] = true;
+  } else {
+    positional.push(rawArgs[i]);
+  }
+}
+
+const command = positional[0];
+
+// ─── Help ─────────────────────────────────────────────────────────────
+function showHelp() {
+  console.log(`
+${c.b}vault${c.r} ${c.d}\u2014 content-addressable storage engine${c.r}
+
+${c.y}commands:${c.r}
+  vault init                          Create a new vault
+  vault add <file|dir> [--as name]    Store files (recursive for dirs)
+  vault get <path> [--out dest]       Extract a file
+  vault ls [pattern]                  List stored files (regex filter)
+  vault info                          Vault statistics
+  vault rm <path>                     Remove a file from vault
+  vault verify                        Verify integrity of all files
+
+${c.y}flags:${c.r}
+  --dir <path>             Vault location (default: current directory)
+  --out <path>             Output path for extraction
+  --as <name>              Virtual name when storing
+  --password, -p <pass>    Encrypt vault with AES-256-GCM
+
+${c.y}encryption:${c.r}
+  vault init -p "mypassword"          Create encrypted vault
+  vault add file.pdf -p "mypassword"  Add file (encrypted chunks)
+  vault get doc.pdf -p "mypassword"   Extract + decrypt file
+
+${c.y}examples:${c.r}
+  vault init
+  vault add report.pdf
+  vault add photos/ --as my-photos
+  vault get my-photos/sunset.jpg --out ~/Desktop/sunset.jpg
+  vault ls "\\.pdf$"
+  vault info
+  vault serve [--port 3777]        Launch web UI
+  vault sync                        Start P2P sync (LAN discovery)
+  vault sync status                 Show sync status and peers
+
+${c.d}zero dependencies \u00B7 SHA-256 verified \u00B7 AES-256-GCM encryption \u00B7 content-defined chunking \u00B7 smart compression${c.r}
+`);
+}
+
+// ─── Execute ──────────────────────────────────────────────────────────
+const vault = new Vault(flags.dir || '.');
+
+try {
+  switch (command) {
+    // ── INIT ──────────────────────────────────────────────────────
+    case 'init': {
+      const result = vault.init(flags.password);
+      console.log(`\n ${dot} vault initialized`);
+      if (result.encrypted) {
+        console.log(` ${dot} ${c.mg}encryption:${c.r} AES-256-GCM ${c.g}\u2713${c.r}`);
+      }
+      console.log(` ${dot} key:   ${c.cy}${result.keyPath}${c.r} ${c.d}(${fmtBytes(result.keySize)})${c.r}`);
+      console.log(` ${dot} store: ${c.cy}${result.chunksDir}${c.r}`);
+      console.log(` ${dot} ${c.d}add files with: vault add <file>${c.r}\n`);
+      break;
+    }
+
+    // ── ADD ───────────────────────────────────────────────────────
+    case 'add': {
+      const target = positional[1];
+      if (!target) {
+        console.error(`\n ${c.red}error:${c.r} specify a file or directory\n`);
+        console.error(` ${c.d}usage: vault add <file|dir>${c.r}\n`);
+        process.exit(1);
+      }
+
+      vault.open(flags.password);
+      console.log(`\n ${dot} scanning...`);
+      const t0 = performance.now();
+      const results = vault.add(target, flags.as);
+      const dt = performance.now() - t0;
+
+      let totalSize = 0, totalChunks = 0, totalNew = 0, totalDup = 0;
+      for (const r of results) {
+        totalSize += r.size;
+        totalChunks += r.chunks;
+        totalNew += r.newChunks;
+        totalDup += r.dupChunks;
+      }
+
+      if (results.length <= 20) {
+        for (const r of results) {
+          const dedup = r.dupChunks > 0
+            ? ` ${c.g}(${r.dupChunks} deduped)${c.r}`
+            : '';
+          console.log(` ${dot} ${c.cy}${r.virtualPath}${c.r}`);
+          console.log(`   ${fmtBytes(r.size)} \u00B7 ${r.chunks} chunks${dedup}`);
+        }
+      } else {
+        console.log(` ${dot} ${results.length} files processed`);
+      }
+
+      console.log(`\n ${dot} ${c.b}total:${c.r} ${fmtBytes(totalSize)} \u00B7 ${totalChunks} chunks (${totalNew} new, ${totalDup} deduped)`);
+      console.log(` ${dot} done in ${c.b}${fmtTime(dt)}${c.r}\n`);
+      break;
+    }
+
+    // ── GET ───────────────────────────────────────────────────────
+    case 'get': {
+      const target = positional[1];
+      if (!target) {
+        console.error(`\n ${c.red}error:${c.r} specify file path to extract\n`);
+        console.error(` ${c.d}usage: vault get <path> [--out dest]${c.r}\n`);
+        process.exit(1);
+      }
+
+      vault.open(flags.password);
+      const t0 = performance.now();
+      const result = vault.get(target, flags.out);
+      const dt = performance.now() - t0;
+
+      console.log(`\n ${dot} ${c.cy}${result.virtualPath}${c.r}`);
+      console.log(` ${dot} ${result.chunks} chunks \u2192 ${vault._encrypted ? 'decrypt \u2192 ' : ''}decompress \u2192 assemble`);
+      console.log(` ${dot} SHA-256 verified ${c.g}\u2713${c.r}`);
+      console.log(` ${dot} ${fmtBytes(result.size)} in ${c.b}${fmtTime(dt)}${c.r}`);
+      console.log(` ${dot} \u2192 ${c.cy}${result.destPath}${c.r}\n`);
+      break;
+    }
+
+    // ── LS ────────────────────────────────────────────────────────
+    case 'ls':
+    case 'list': {
+      vault.open(flags.password);
+      const files = vault.ls(positional[1]);
+
+      if (files.length === 0) {
+        console.log(`\n ${dot} vault is empty\n`);
+        break;
+      }
+
+      const totalSize = files.reduce((s, f) => s + f.size, 0);
+      console.log(`\n ${dot} ${c.b}${files.length} files${c.r} ${c.d}\u00B7 ${fmtBytes(totalSize)}${c.r}\n`);
+      console.log(` ${c.d}${'path'.padEnd(50)} ${'size'.padStart(12)} ${'chunks'.padStart(8)} stored${c.r}`);
+      console.log(` ${c.d}${'\u2500'.repeat(90)}${c.r}`);
+
+      for (const f of files) {
+        const p = f.path.length > 48 ? '\u2026' + f.path.slice(-47) : f.path;
+        console.log(
+          ` ${c.cy}${p.padEnd(50)}${c.r}` +
+          ` ${fmtBytes(f.size).padStart(12)}` +
+          ` ${String(f.chunks).padStart(8)}` +
+          ` ${c.d}${fmtDate(f.stored)}${c.r}`
+        );
+      }
+      console.log('');
+      break;
+    }
+
+    // ── INFO ──────────────────────────────────────────────────────
+    case 'info':
+    case 'stats': {
+      vault.open(flags.password);
+      const s = vault.stats();
+
+      console.log(`\n ${dot} ${c.b}VAULT${c.r}${s.encrypted ? ` ${c.mg}[ENCRYPTED]${c.r}` : ''}`);
+      console.log(` ${c.d}${'\u2500'.repeat(45)}${c.r}`);
+      console.log(` ${c.d}files:${c.r}           ${c.b}${s.files}${c.r}`);
+      console.log(` ${c.d}original size:${c.r}   ${c.b}${fmtBytes(s.totalOriginal)}${c.r}`);
+      console.log(` ${c.d}stored size:${c.r}     ${c.b}${fmtBytes(s.totalStored)}${c.r}  ${c.d}(chunks on disk)${c.r}`);
+      console.log(` ${c.d}key file:${c.r}        ${c.b}${fmtBytes(s.keySize)}${c.r}`);
+      console.log(` ${c.d}total on disk:${c.r}   ${c.b}${fmtBytes(s.totalOnDisk)}${c.r}`);
+      console.log(` ${c.d}ratio:${c.r}           ${c.b}${s.ratio}:1${c.r}` +
+        (s.totalOriginal > s.totalOnDisk
+          ? ` ${c.g}(saved ${fmtBytes(s.totalOriginal - s.totalOnDisk)})${c.r}`
+          : ''));
+      console.log(` ${c.d}unique chunks:${c.r}   ${c.b}${s.uniqueChunks}${c.r}`);
+      console.log(` ${c.d}chunk refs:${c.r}      ${c.b}${s.totalChunkRefs}${c.r}` +
+        (s.dedupSaved > 0
+          ? ` ${c.g}(${s.dedupSaved} deduped)${c.r}`
+          : ''));
+      if (s.encrypted) {
+        console.log(` ${c.d}encryption:${c.r}      ${c.mg}AES-256-GCM${c.r}`);
+      }
+      console.log(` ${c.d}created:${c.r}         ${fmtDate(s.created)}`);
+      console.log('');
+      break;
+    }
+
+    // ── RM ────────────────────────────────────────────────────────
+    case 'rm':
+    case 'remove': {
+      const target = positional[1];
+      if (!target) {
+        console.error(`\n ${c.red}error:${c.r} specify file to remove\n`);
+        process.exit(1);
+      }
+
+      vault.open(flags.password);
+      const result = vault.rm(target);
+      console.log(`\n ${dot} removed: ${c.cy}${result.removed}${c.r}`);
+      if (result.chunksRemoved > 0) {
+        console.log(` ${dot} garbage collected: ${result.chunksRemoved} chunks (${fmtBytes(result.freedBytes)} freed)`);
+      }
+      console.log('');
+      break;
+    }
+
+    // ── VERIFY ────────────────────────────────────────────────────
+    case 'verify':
+    case 'check': {
+      vault.open(flags.password);
+      const t0 = performance.now();
+      const results = vault.verify();
+      const dt = performance.now() - t0;
+
+      let allOk = true;
+      for (const r of results) {
+        const status = r.ok
+          ? `${c.g}\u2713${c.r}`
+          : `${c.red}\u2717 (${r.missingChunks} missing chunks)${c.r}`;
+        console.log(` ${status} ${c.cy}${r.path}${c.r} ${c.d}${fmtBytes(r.size)} \u00B7 ${r.chunks} chunks${c.r}`);
+        if (!r.ok) allOk = false;
+      }
+
+      console.log(`\n ${dot} ${results.length} files verified in ${fmtTime(dt)}`);
+      if (allOk) {
+        console.log(` ${dot} ${c.g}all files intact${c.r}\n`);
+      } else {
+        console.log(` ${dot} ${c.red}SOME FILES CORRUPTED${c.r}\n`);
+        process.exit(1);
+      }
+      break;
+    }
+
+    // ── HELP / UNKNOWN ────────────────────────────────────────────
+    case 'help':
+    case '--help':
+    case '-h':
+    case undefined:
+      showHelp();
+      break;
+
+    // ── SERVE ───────────────────────────────────────────────────
+    case 'serve':
+    case 'web':
+    case 'ui': {
+      const { startServer } = require('../src/server');
+      const port = parseInt(flags.port) || 3777;
+      startServer(flags.dir || '.', port);
+      break;
+    }
+
+    // ── SYNC ────────────────────────────────────────────────────
+    case 'sync': {
+      const { startSync, stopSync, getSyncStatus } = require('../src/sync');
+      const sub = positional[1];
+
+      if (sub === 'status') {
+        const status = getSyncStatus();
+        if (!status.running) {
+          console.log(`\n ${dot} sync is ${c.red}not running${c.r}\n`);
+        } else {
+          console.log(`\n ${dot} ${c.b}SYNC STATUS${c.r}`);
+          console.log(` ${c.d}vault:${c.r}     ${status.vaultId}`);
+          console.log(` ${c.d}peers:${c.r}     ${status.peers.length}`);
+          console.log(` ${c.d}pending:${c.r}   ${status.pending} chunks`);
+          if (status.lastSync) {
+            console.log(` ${c.d}last sync:${c.r} ${fmtDate(status.lastSync)}`);
+          }
+          for (const p of status.peers) {
+            const age = (p.age / 1000).toFixed(0);
+            console.log(`   ${c.cy}${p.hostname}${c.r} ${c.d}(${p.host})${c.r} seen ${age}s ago`);
+          }
+          console.log('');
+        }
+      } else {
+        const info = startSync(flags.dir || '.', {
+          udpPort: parseInt(flags.udpPort) || 3778,
+          tcpPort: parseInt(flags.tcpPort) || 3779,
+        });
+        console.log(`\n ${dot} ${c.b}sync started${c.r}`);
+        console.log(` ${dot} vault id:  ${c.cy}${info.vaultId}${c.r}`);
+        console.log(` ${dot} hostname:  ${c.cy}${info.hostname}${c.r}`);
+        console.log(` ${dot} discovery: UDP :${info.udpPort}`);
+        console.log(` ${dot} transfer:  TCP :${info.tcpPort}`);
+        console.log(` ${dot} ${c.d}listening for peers on LAN...${c.r}\n`);
+
+        // Keep process alive and show peer updates
+        const statusInterval = setInterval(() => {
+          const s = getSyncStatus();
+          if (s.peers.length > 0) {
+            const names = s.peers.map(p => p.hostname).join(', ');
+            process.stdout.write(`\r ${dot} ${c.g}${s.peers.length} peer(s):${c.r} ${names}  `);
+          }
+        }, 5000);
+
+        process.on('SIGINT', () => {
+          clearInterval(statusInterval);
+          stopSync();
+          console.log(`\n\n ${dot} sync stopped\n`);
+          process.exit(0);
+        });
+      }
+      break;
+    }
+
+    default:
+      console.error(`\n ${c.red}unknown command:${c.r} ${command}`);
+      console.error(` ${c.d}run "vault help" for usage${c.r}\n`);
+      process.exit(1);
+  }
+} catch (err) {
+  console.error(`\n ${c.red}error:${c.r} ${err.message}\n`);
+  process.exit(1);
+}
