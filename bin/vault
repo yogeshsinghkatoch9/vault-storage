@@ -287,6 +287,47 @@ try {
       break;
     }
 
+    // ── SCAN (Disk X-Ray) ──────────────────────────────────────
+    case 'scan':
+    case 'xray': {
+      const target = positional[1] || '.';
+      const { scan } = require('../src/scanner');
+      console.log(`\n ${dot} scanning ${c.cy}${target}${c.r}...`);
+      const result = scan(target);
+
+      console.log(` ${dot} scanned ${c.b}${result.totalFiles.toLocaleString()}${c.r} files in ${c.b}${result.scannedDirs}${c.r} dirs (${fmtTime(result.scanTime)})`);
+      if (result.skippedDirs > 0) console.log(` ${dot} skipped ${result.skippedDirs} dirs (node_modules, .git, etc.)`);
+      console.log(`\n ${dot} ${c.b}DISK X-RAY${c.r}`);
+      console.log(` ${c.d}${'\u2500'.repeat(50)}${c.r}`);
+      console.log(` ${c.d}total size:${c.r}         ${c.b}${fmtBytes(result.totalSize)}${c.r}`);
+      console.log(` ${c.d}duplicate waste:${c.r}     ${c.red}${fmtBytes(result.duplicates.wastedBytes)}${c.r} ${c.d}(${result.duplicates.groups} groups)${c.r}`);
+      console.log(` ${c.d}vault estimate:${c.r}      ${c.g}${fmtBytes(result.vaultEstimate.estimatedVaultSize)}${c.r} ${c.d}(${result.vaultEstimate.estimatedRatio}:1)${c.r}`);
+      console.log(` ${c.d}potential savings:${c.r}   ${c.g}${fmtBytes(result.vaultEstimate.estimatedSavings)}${c.r} ${c.g}(${result.vaultEstimate.savingsPct}%)${c.r}`);
+
+      console.log(`\n ${dot} ${c.b}TOP FILE TYPES${c.r}`);
+      result.typeBreakdown.slice(0, 10).forEach(t => {
+        const bar = '\u2588'.repeat(Math.max(1, Math.round(parseFloat(t.pct) / 3)));
+        console.log(`   ${c.cy}${t.ext.padEnd(10)}${c.r} ${c.y}${bar}${c.r} ${fmtBytes(t.totalSize).padStart(10)} ${c.d}(${t.count} files, ${t.pct}%)${c.r}`);
+      });
+
+      if (result.duplicates.details.length) {
+        console.log(`\n ${dot} ${c.b}WORST DUPLICATES${c.r}`);
+        result.duplicates.details.slice(0, 5).forEach(d => {
+          console.log(`   ${c.red}${fmtBytes(d.waste)} wasted${c.r} ${c.d}\u2014 ${d.count} copies of ${fmtBytes(d.size)} file${c.r}`);
+          d.files.slice(0, 3).forEach(f => console.log(`     ${c.d}${f}${c.r}`));
+          if (d.files.length > 3) console.log(`     ${c.d}...and ${d.files.length - 3} more${c.r}`);
+        });
+      }
+
+      console.log(`\n ${dot} ${c.b}LARGEST FILES${c.r}`);
+      result.largest.slice(0, 10).forEach(f => {
+        console.log(`   ${fmtBytes(f.size).padStart(10)}  ${c.d}${f.path}${c.r}`);
+      });
+
+      console.log(`\n ${dot} ${c.d}fix it: vault add ${target}${c.r}\n`);
+      break;
+    }
+
     // ── HELP / UNKNOWN ────────────────────────────────────────────
     case 'help':
     case '--help':

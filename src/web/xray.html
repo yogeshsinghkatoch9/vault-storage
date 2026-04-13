@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Disk X-Ray</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#06060a;color:#e0e0e0;font-family:'Inter',system-ui,sans-serif;min-height:100vh;overflow-x:hidden}
+
+  .header{padding:20px 28px;display:flex;align-items:center;gap:16px;border-bottom:1px solid rgba(255,255,255,.04)}
+  .logo{font-size:22px;font-weight:300;letter-spacing:6px;color:rgba(255,255,255,.4)}
+  .logo b{color:rgba(255,200,100,.7);font-weight:400}
+  .scan-bar{flex:1;display:flex;gap:8px;max-width:600px}
+  .scan-input{flex:1;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);color:#e0e0e0;font-size:13px;padding:10px 16px;border-radius:10px;font-family:inherit;outline:none;transition:border-color .2s}
+  .scan-input:focus{border-color:rgba(255,200,100,.3)}
+  .scan-btn{background:rgba(255,200,100,.08);border:1px solid rgba(255,200,100,.2);color:rgba(255,200,100,.7);font-size:12px;letter-spacing:2px;padding:10px 24px;border-radius:10px;cursor:pointer;font-family:inherit;transition:all .2s;text-transform:uppercase}
+  .scan-btn:hover{background:rgba(255,200,100,.15);color:rgba(255,200,100,.9)}
+  .scan-btn:disabled{opacity:.3;cursor:not-allowed}
+
+  .loading{display:none;text-align:center;padding:80px 20px;color:rgba(255,200,100,.4);font-size:14px;letter-spacing:2px}
+  .loading.show{display:block}
+  .loading .spinner{display:inline-block;width:28px;height:28px;border:2px solid rgba(255,200,100,.1);border-top-color:rgba(255,200,100,.5);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:16px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .results{display:none;padding:20px 28px}
+  .results.show{display:block}
+
+  /* KPI Cards */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:24px}
+  .kpi{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);border-radius:12px;padding:16px 20px;text-align:center}
+  .kpi-val{font-size:28px;font-weight:600;color:rgba(255,200,100,.7);font-variant-numeric:tabular-nums}
+  .kpi-label{font-size:9px;letter-spacing:2px;color:rgba(255,255,255,.2);text-transform:uppercase;margin-top:4px}
+  .kpi-green .kpi-val{color:rgba(100,255,150,.7)}
+  .kpi-red .kpi-val{color:rgba(255,100,100,.7)}
+
+  /* Savings banner */
+  .savings-banner{background:linear-gradient(135deg,rgba(255,200,100,.06),rgba(100,255,150,.04));border:1px solid rgba(255,200,100,.15);border-radius:14px;padding:24px;text-align:center;margin-bottom:24px}
+  .savings-big{font-size:48px;font-weight:700;color:rgba(255,200,100,.8)}
+  .savings-sub{font-size:13px;color:rgba(255,255,255,.25);margin-top:4px}
+  .savings-action{margin-top:14px;display:inline-block;background:rgba(255,200,100,.1);border:1px solid rgba(255,200,100,.25);color:rgba(255,200,100,.8);font-size:12px;letter-spacing:2px;padding:10px 28px;border-radius:24px;cursor:pointer;font-family:inherit;text-decoration:none;text-transform:uppercase;transition:all .2s}
+  .savings-action:hover{background:rgba(255,200,100,.2)}
+
+  /* Sections */
+  .section{margin-bottom:28px}
+  .section-title{font-size:10px;letter-spacing:3px;color:rgba(255,255,255,.1);text-transform:uppercase;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.03)}
+
+  /* Treemap */
+  .treemap{display:flex;flex-wrap:wrap;gap:3px;min-height:200px}
+  .tree-cell{border-radius:6px;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:6px;overflow:hidden;cursor:default;transition:opacity .2s;min-width:30px;min-height:30px}
+  .tree-cell:hover{opacity:.8}
+  .tree-name{font-size:8px;color:rgba(255,255,255,.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .tree-size{font-size:7px;color:rgba(255,255,255,.4)}
+
+  /* Tables */
+  .tbl{width:100%;border-collapse:collapse;font-size:11px}
+  .tbl th{text-align:left;font-size:9px;letter-spacing:1px;color:rgba(255,255,255,.15);text-transform:uppercase;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.04)}
+  .tbl td{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.02);color:rgba(255,255,255,.35)}
+  .tbl tr:hover td{color:rgba(255,255,255,.6)}
+  .tbl .num{text-align:right;font-variant-numeric:tabular-nums}
+  .tbl .bar-cell{width:120px}
+  .mini-bar{height:4px;border-radius:2px;background:rgba(255,200,100,.15)}
+  .mini-bar-fill{height:100%;border-radius:2px;background:rgba(255,200,100,.5)}
+
+  /* Dupe cards */
+  .dupe-card{background:rgba(255,100,100,.02);border:1px solid rgba(255,100,100,.08);border-radius:10px;padding:12px 16px;margin-bottom:8px}
+  .dupe-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .dupe-waste{font-size:13px;font-weight:600;color:rgba(255,100,100,.6)}
+  .dupe-count{font-size:9px;color:rgba(255,255,255,.15);letter-spacing:1px}
+  .dupe-files{font-size:10px;color:rgba(255,255,255,.2);line-height:1.6;word-break:break-all}
+
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+  @media(max-width:800px){.grid-2{grid-template-columns:1fr}}
+
+  /* Type bar chart */
+  .type-row{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .type-ext{font-size:10px;color:rgba(255,255,255,.3);min-width:60px;text-align:right}
+  .type-bar{flex:1;height:16px;background:rgba(255,255,255,.02);border-radius:4px;overflow:hidden;position:relative}
+  .type-fill{height:100%;border-radius:4px;transition:width .5s}
+  .type-meta{font-size:9px;color:rgba(255,255,255,.15);min-width:80px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo"><b>X</b>-RAY</div>
+  <div class="scan-bar">
+    <input class="scan-input" id="dirInput" placeholder="directory path to scan (e.g. ~/Documents)" value="">
+    <button class="scan-btn" id="scanBtn" onclick="doScan()">SCAN</button>
+  </div>
+</div>
+
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <div>scanning directory...</div>
+</div>
+
+<div class="results" id="results">
+  <!-- KPI cards -->
+  <div class="kpis" id="kpis"></div>
+
+  <!-- Savings banner -->
+  <div class="savings-banner" id="savingsBanner">
+    <div class="savings-big" id="savingsVal">-</div>
+    <div class="savings-sub" id="savingsSub">estimated savings with vault</div>
+    <a class="savings-action" href="/">open vault &rarr;</a>
+  </div>
+
+  <!-- Treemap -->
+  <div class="section">
+    <div class="section-title">space usage by directory</div>
+    <div class="treemap" id="treemap"></div>
+  </div>
+
+  <div class="grid-2">
+    <!-- File type breakdown -->
+    <div class="section">
+      <div class="section-title">file types</div>
+      <div id="typeChart"></div>
+    </div>
+
+    <!-- Largest files -->
+    <div class="section">
+      <div class="section-title">largest files</div>
+      <table class="tbl" id="largestTable">
+        <thead><tr><th>file</th><th class="num">size</th></tr></thead>
+        <tbody id="largestBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Duplicates -->
+  <div class="section">
+    <div class="section-title" id="dupeTitle">duplicates</div>
+    <div id="dupeList"></div>
+  </div>
+</div>
+
+<script>
+function fmtB(b) {
+  if (!b || isNaN(b)) return '0 B';
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  if (b < 1073741824) return (b/1048576).toFixed(1) + ' MB';
+  return (b/1073741824).toFixed(2) + ' GB';
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+const COLORS = [
+  '#ff6b6b','#ffa36b','#ffd56b','#a8e06b','#6be0a8','#6bcaff',
+  '#6b8fff','#a06bff','#e06bff','#ff6bca','#ff8fa0','#ffc078',
+  '#e8d44d','#7ae07a','#5cc5c5','#7aa3e0','#a07ae0','#d47ae0',
+];
+
+async function doScan() {
+  const dir = document.getElementById('dirInput').value.trim();
+  if (!dir) { document.getElementById('dirInput').focus(); return; }
+
+  document.getElementById('loading').classList.add('show');
+  document.getElementById('results').classList.remove('show');
+  document.getElementById('scanBtn').disabled = true;
+
+  try {
+    const res = await fetch('/api/scan?dir=' + encodeURIComponent(dir));
+    const data = await res.json();
+    if (data.error) { alert('Scan error: ' + data.error); return; }
+    renderResults(data);
+  } catch(e) {
+    alert('Scan failed: ' + e.message);
+  } finally {
+    document.getElementById('loading').classList.remove('show');
+    document.getElementById('scanBtn').disabled = false;
+  }
+}
+
+function renderResults(d) {
+  document.getElementById('results').classList.add('show');
+
+  // KPIs
+  const kpis = document.getElementById('kpis');
+  kpis.innerHTML = `
+    <div class="kpi"><div class="kpi-val">${d.totalFiles.toLocaleString()}</div><div class="kpi-label">files scanned</div></div>
+    <div class="kpi"><div class="kpi-val">${fmtB(d.totalSize)}</div><div class="kpi-label">total size</div></div>
+    <div class="kpi kpi-red"><div class="kpi-val">${fmtB(d.duplicates.wastedBytes)}</div><div class="kpi-label">wasted on duplicates</div></div>
+    <div class="kpi"><div class="kpi-val">${d.duplicates.groups}</div><div class="kpi-label">duplicate groups</div></div>
+    <div class="kpi kpi-green"><div class="kpi-val">${d.vaultEstimate.estimatedRatio}:1</div><div class="kpi-label">estimated vault ratio</div></div>
+    <div class="kpi"><div class="kpi-val">${d.scanTime.toLocaleString()}ms</div><div class="kpi-label">scan time</div></div>
+  `;
+
+  // Savings banner
+  document.getElementById('savingsVal').textContent = d.vaultEstimate.savingsPct + '% saved';
+  document.getElementById('savingsSub').textContent =
+    fmtB(d.totalSize) + ' → ' + fmtB(d.vaultEstimate.estimatedVaultSize) +
+    ' (save ' + fmtB(d.vaultEstimate.estimatedSavings) + ')';
+
+  // Treemap
+  const treemap = document.getElementById('treemap');
+  treemap.innerHTML = '';
+  const maxDir = d.dirTree.length ? d.dirTree[0].size : 1;
+  d.dirTree.slice(0, 40).forEach((dir, i) => {
+    const pct = (dir.size / d.totalSize) * 100;
+    if (pct < 0.5) return;
+    const cell = document.createElement('div');
+    cell.className = 'tree-cell';
+    const area = Math.max(40, Math.sqrt(pct) * 50);
+    cell.style.width = area + 'px';
+    cell.style.height = area + 'px';
+    cell.style.background = COLORS[i % COLORS.length] + '20';
+    cell.style.border = '1px solid ' + COLORS[i % COLORS.length] + '30';
+    cell.title = dir.dir + '\n' + fmtB(dir.size) + ' (' + dir.pct + '%)';
+    cell.innerHTML = '<div class="tree-name">' + esc(dir.dir === '.' ? '(root)' : dir.dir) + '</div><div class="tree-size">' + fmtB(dir.size) + '</div>';
+    treemap.appendChild(cell);
+  });
+
+  // File type chart
+  const typeChart = document.getElementById('typeChart');
+  typeChart.innerHTML = '';
+  const maxType = d.typeBreakdown.length ? d.typeBreakdown[0].totalSize : 1;
+  d.typeBreakdown.slice(0, 15).forEach((t, i) => {
+    const pct = (t.totalSize / maxType) * 100;
+    const row = document.createElement('div');
+    row.className = 'type-row';
+    row.innerHTML =
+      '<div class="type-ext">' + esc(t.ext) + '</div>' +
+      '<div class="type-bar"><div class="type-fill" style="width:' + pct + '%;background:' + COLORS[i % COLORS.length] + '80"></div></div>' +
+      '<div class="type-meta">' + fmtB(t.totalSize) + ' / ' + t.count + '</div>';
+    typeChart.appendChild(row);
+  });
+
+  // Largest files
+  const tbody = document.getElementById('largestBody');
+  tbody.innerHTML = '';
+  d.largest.slice(0, 20).forEach(f => {
+    const tr = document.createElement('tr');
+    const name = f.path.length > 60 ? '...' + f.path.slice(-57) : f.path;
+    tr.innerHTML = '<td title="' + esc(f.path) + '">' + esc(name) + '</td><td class="num">' + fmtB(f.size) + '</td>';
+    tbody.appendChild(tr);
+  });
+
+  // Duplicates
+  const dupeTitle = document.getElementById('dupeTitle');
+  dupeTitle.textContent = 'duplicates (' + d.duplicates.groups + ' groups, ' + fmtB(d.duplicates.wastedBytes) + ' wasted)';
+  const dupeList = document.getElementById('dupeList');
+  dupeList.innerHTML = '';
+  if (!d.duplicates.details.length) {
+    dupeList.innerHTML = '<div style="color:rgba(100,255,150,.3);font-size:11px;padding:20px;text-align:center">No duplicates found. Clean!</div>';
+  } else {
+    d.duplicates.details.slice(0, 20).forEach(dup => {
+      const card = document.createElement('div');
+      card.className = 'dupe-card';
+      card.innerHTML =
+        '<div class="dupe-header"><div class="dupe-waste">wasting ' + fmtB(dup.waste) + '</div><div class="dupe-count">' + dup.count + ' copies of ' + fmtB(dup.size) + ' file</div></div>' +
+        '<div class="dupe-files">' + dup.files.map(f => esc(f)).join('<br>') + '</div>';
+      dupeList.appendChild(card);
+    });
+  }
+}
+
+// Auto-fill with home directory hint
+document.getElementById('dirInput').value = '';
+document.getElementById('dirInput').placeholder = 'enter a folder path (e.g. /Users/' + 'you/Documents)';
+
+// Enter key triggers scan
+document.getElementById('dirInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doScan();
+});
+</script>
+</body>
+</html>

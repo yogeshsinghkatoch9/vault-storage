@@ -6,6 +6,7 @@ const path = require('path');
 const os = require('os');
 const zlib = require('zlib');
 const Vault = require('./engine');
+const { scan: diskScan } = require('./scanner');
 
 // ─── Minimal ZIP builder (zero dependencies) ─────────────────────────
 // Builds a valid ZIP archive in memory from an array of {name, data} entries
@@ -179,6 +180,26 @@ function startServer(vaultDir, port = 3777) {
           'Cache-Control': 'public, max-age=86400',
         });
         res.end(MANIFEST);
+        return;
+      }
+
+      // ─── Disk X-Ray page ─────────────────────────────────────
+      if (req.method === 'GET' && url.pathname === '/xray') {
+        const xrayPath = path.join(__dirname, 'web', 'xray.html');
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(fs.readFileSync(xrayPath));
+        return;
+      }
+
+      // ─── API: scan directory ───────────────────────────────────
+      if (req.method === 'GET' && url.pathname === '/api/scan') {
+        const dir = url.searchParams.get('dir') || os.homedir();
+        try {
+          const result = diskScan(dir);
+          json(res, result);
+        } catch (e) {
+          json(res, { error: e.message }, 500);
+        }
         return;
       }
 
