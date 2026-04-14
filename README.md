@@ -177,6 +177,8 @@ vault serve
 | `vault rm <path>` | Remove a file (auto garbage-collects chunks) |
 | `vault verify` | Verify SHA-256 integrity of all files |
 | `vault serve [--port N]` | Launch web UI (default: port 3777) |
+| `vault scan <dir>` | Disk X-Ray — find duplicates and wasted space |
+| `vault watch <dir> [dir2...]` | Auto-backup — monitor folders for changes |
 | `vault sync` | Start P2P sync (LAN auto-discovery) |
 
 ### Encryption
@@ -204,14 +206,51 @@ vault serve
 
 Opens at `http://localhost:3777`. Features:
 
-- Drag-and-drop files and folders
-- Auto-skips `node_modules`, `.git`, and other regenerable directories
-- Live compression stats and classification breakdown
-- Per-file extract, delete, and preview
-- Download entire vault or specific folders as ZIP (preserves structure)
-- Search, sort, dark/light theme
+- Drag-and-drop files and **folders** (recursively reads all contents)
+- Auto-skips `node_modules`, `.git`, `__pycache__`, `dist`, `build`, and 15+ other regenerable directories
+- Parallel uploads (5 at a time) with progress bar
+- Live compression stats, classification breakdown, and storage location
+- Per-file extract, delete, and preview (images render inline, text shows first 200 lines)
+- **Download entire vault or individual folders as ZIP** — preserves full directory structure
+- Folder grouping with per-folder ZIP buttons
+- Search, sort (by name, size, date, category), dark/light theme toggle
+- Auto-backup panel — start/stop watching a directory from the browser
+- Disk X-Ray link — scan any folder for waste
 - Mobile-ready PWA — install on your phone's home screen
-- Works offline after first load
+- Service worker for offline caching
+- Batch operations: extract all, delete all
+
+### Disk X-Ray
+
+```bash
+vault scan ~/Documents
+```
+
+Scans any directory and reports:
+
+- **Total size** and file count
+- **Duplicate detection** — finds exact duplicates via partial hash matching (head + tail bytes)
+- **Wasted space** — shows how many bytes are wasted on duplicates
+- **File type breakdown** — which types consume the most space
+- **Largest files** — top 30 biggest files ranked
+- **Vault savings estimate** — predicts how much vault would compress your data
+- **Web visualization** at `http://localhost:3777/xray` — interactive treemap, type bar chart, duplicate cards
+
+### Auto-Backup Watcher
+
+```bash
+vault watch ~/Documents ~/Desktop
+```
+
+Monitors directories in real time. When you save, create, or modify any file, it's automatically vaulted — deduplicated, compressed, SHA-256 verified. No manual backup needed.
+
+- Uses `fs.watch` (FSEvents on macOS, inotify on Linux, ReadDirectoryChanges on Windows)
+- Recursive directory monitoring — watches subdirectories automatically
+- 300ms debounce for rapid saves (prevents duplicate processing)
+- Skips `node_modules`, `.git`, and other regenerable directories
+- Detects new files, modified files, and new directories
+- Live status: files added, updated, errors
+- Also available in the web UI sidebar — start/stop from the browser
 
 ### P2P Sync
 
@@ -238,22 +277,21 @@ vault --dir /mnt/usb-drive serve
 ### Architecture
 
 ```
-                        vault CLI / Web UI
-                              |
-                   +----------+-----------+
-                   |                      |
-              Vault Engine           Sync Engine
-              (src/engine.js)        (src/sync.js)
-                   |                      |
-         +---------+---------+       UDP broadcast
-         |         |         |       (discovery)
-      Chunker  Classifier  Crypto        +
-      (CDC)    (magic/ext)  (AES)    TCP transfer
-         |         |         |       (delta sync)
-         +----+----+----+----+
-              |
-       .vault/chunks/
-       ab/cd/abcd...ef.chunk
+                         vault CLI / Web UI
+                               |
+              +--------+-------+-------+--------+
+              |        |       |       |        |
+           Engine   Scanner  Watcher  Sync    Server
+              |        |       |       |        |
+        +-----+-----+ |    fs.watch  UDP    HTTP +
+        |     |     |  |              +      PWA
+     Chunker Class Crypto         TCP sync
+      (CDC) (magic) (AES)
+        |     |     |
+        +--+--+--+--+
+           |
+    .vault/chunks/
+    ab/cd/abcd...ef.chunk
 ```
 
 ### Content-Defined Chunking (CDC)
@@ -319,19 +357,22 @@ my-project/
 
 ```
 vault-storage/
-  bin/vault           CLI entry point
+  bin/vault             CLI (init, add, get, ls, info, rm, verify, serve, scan, watch, sync)
   src/
-    engine.js         Core: chunking, dedup, compression, encryption
-    chunker.js        Content-defined chunking (Gear rolling hash)
-    classifier.js     File type detection (magic bytes + extensions)
-    crypto.js         AES-256-GCM + PBKDF2 key derivation
-    sync.js           P2P discovery (UDP) + transfer (TCP)
-    server.js         HTTP server + PWA support
+    engine.js           Core: CDC chunking, dedup, compression, encryption
+    chunker.js          Content-defined chunking (Gear rolling hash)
+    classifier.js       File type detection (magic bytes + 80+ extensions)
+    crypto.js           AES-256-GCM encryption + PBKDF2 key derivation
+    scanner.js          Disk X-Ray — duplicate detection, type analysis, savings estimation
+    watcher.js          Auto-backup — fs.watch based real-time directory monitor
+    sync.js             P2P sync — UDP discovery + TCP chunk transfer
+    server.js           HTTP server + PWA manifest + ZIP builder
     web/
-      index.html      Full web UI (PWA, dark/light, mobile-ready)
-      sw.js           Service worker for offline caching
-  test.js             66 tests covering all features
-  LICENSE             MIT
+      index.html        Full web UI (PWA, drag-drop folders, dark/light, mobile-ready)
+      xray.html         Disk X-Ray visualization (treemap, type chart, duplicate cards)
+      sw.js             Service worker for offline caching
+  test.js               66 tests covering all features
+  LICENSE               MIT
 ```
 
 **Zero external dependencies.** Built entirely on Node.js built-in modules: `crypto`, `zlib`, `fs`, `path`, `http`, `net`, `dgram`, `os`.
