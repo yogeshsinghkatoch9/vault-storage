@@ -287,6 +287,48 @@ try {
       break;
     }
 
+    // ── WATCH (Auto-backup) ─────────────────────────────────────
+    case 'watch': {
+      const dirs = positional.slice(1);
+      if (!dirs.length) {
+        console.error(`\n ${c.red}error:${c.r} specify directories to watch\n`);
+        console.error(` ${c.d}usage: vault watch ~/Documents ~/Desktop${c.r}\n`);
+        process.exit(1);
+      }
+
+      const { Watcher } = require('../src/watcher');
+      const watcher = new Watcher(flags.dir || '.', flags.password);
+      watcher.onLog = (entry) => {
+        const time = new Date(entry.time).toLocaleTimeString();
+        console.log(` ${c.d}${time}${c.r} ${dot} ${entry.msg}`);
+      };
+      watcher.start(dirs);
+
+      console.log(`\n ${dot} ${c.b}AUTO-BACKUP ACTIVE${c.r}`);
+      console.log(` ${dot} watching: ${dirs.map(d => c.cy + d + c.r).join(', ')}`);
+      console.log(` ${dot} vault: ${c.cy}${flags.dir || '.'}${c.r}`);
+      console.log(` ${dot} ${c.d}press Ctrl+C to stop${c.r}\n`);
+
+      // Status every 30s
+      const statusInterval = setInterval(() => {
+        const s = watcher.getStatus();
+        if (s.added || s.updated) {
+          console.log(` ${dot} ${c.d}status: ${s.added} added, ${s.updated} updated, ${s.errors} errors, ${s.watcherCount} watchers${c.r}`);
+        }
+      }, 30000);
+
+      process.on('SIGINT', () => {
+        console.log(`\n ${dot} stopping...`);
+        watcher.stop();
+        clearInterval(statusInterval);
+        const s = watcher.getStatus();
+        console.log(` ${dot} ${c.b}session:${c.r} ${s.added} added, ${s.updated} updated, ${s.errors} errors`);
+        console.log('');
+        process.exit(0);
+      });
+      break;
+    }
+
     // ── SCAN (Disk X-Ray) ──────────────────────────────────────
     case 'scan':
     case 'xray': {

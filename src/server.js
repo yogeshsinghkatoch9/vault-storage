@@ -130,6 +130,8 @@ const MANIFEST = JSON.stringify({
 
 function startServer(vaultDir, port = 3777) {
   const vault = new Vault(vaultDir);
+  const { Watcher } = require('./watcher');
+  let watcher = null;
 
   // Ensure vault exists
   if (!fs.existsSync(vault.keyPath)) vault.init();
@@ -148,40 +150,6 @@ function startServer(vaultDir, port = 3777) {
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
     try {
-      // ─── Fractal splash page ─────────────────────────────────
-      if (req.method === 'GET' && url.pathname === '/fractal') {
-        const fractalPath = path.join(__dirname, 'web', 'fractal.html');
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
-        res.end(fs.readFileSync(fractalPath));
-        return;
-      }
-
-      // ─── API: fractal fingerprint for a file ───────────────────
-      // Maps a file's SHA-256 hash to a unique Mandelbrot coordinate
-      if (req.method === 'GET' && url.pathname === '/api/fingerprint') {
-        const vpath = url.searchParams.get('path');
-        if (!vpath) { json(res, { error: 'path required' }, 400); return; }
-        const file = vault.manifest?.files?.[vpath];
-        if (!file) { json(res, { error: 'file not found' }, 404); return; }
-        const hash = file.hash;
-        // Map hash to Mandelbrot coordinates in interesting region
-        const h1 = parseInt(hash.slice(0, 8), 16);
-        const h2 = parseInt(hash.slice(8, 16), 16);
-        const h3 = parseInt(hash.slice(16, 24), 16);
-        const cx = -2.0 + (h1 / 0xFFFFFFFF) * 3.0;  // [-2, 1]
-        const cy = -1.2 + (h2 / 0xFFFFFFFF) * 2.4;   // [-1.2, 1.2]
-        const zoomLevel = 0.001 + (h3 / 0xFFFFFFFF) * 0.1; // deep zoom
-        const palette = (h1 % 9);
-        const coloring = (h2 % 7);
-        json(res, {
-          path: vpath,
-          hash: hash,
-          fractal: { cx, cy, zoom: zoomLevel, palette, coloring },
-          url: `/fractal#cx=${cx}&cy=${cy}&zoom=${zoomLevel}&pal=${palette}&col=${coloring}`,
-        });
-        return;
-      }
-
       // ─── Serve UI ──────────────────────────────────────────────
       if (req.method === 'GET' && url.pathname === '/') {
         const html = fs.readFileSync(htmlPath);
@@ -214,6 +182,41 @@ function startServer(vaultDir, port = 3777) {
           'Cache-Control': 'public, max-age=86400',
         });
         res.end(MANIFEST);
+        return;
+      }
+
+      // ─── API: start/stop auto-backup watcher ──────────────────
+      if (req.method === 'POST' && url.pathname === '/api/watch/start') {
+        const chunks = [];
+        req.on('data', c => chunks.push(c));
+        req.on('end', () => {
+          try {
+            const body = JSON.parse(Buffer.concat(chunks).toString());
+            const dirs = body.dirs || [];
+            if (!dirs.length) { json(res, { error: 'dirs required' }, 400); return; }
+            if (watcher) watcher.stop();
+            watcher = new Watcher(vaultDir);
+            watcher.start(dirs);
+            json(res, { ok: true, watching: dirs });
+          } catch (e) { json(res, { error: e.message }, 500); }
+        });
+        return;
+      }
+
+      if (req.method === 'POST' && url.pathname === '/api/watch/stop') {
+        if (watcher) { watcher.stop(); watcher = null; }
+        json(res, { ok: true, stopped: true });
+        return;
+      }
+
+      if (req.method === 'GET' && url.pathname === '/api/watch/status') {
+        if (!watcher) { json(res, { running: false }); return; }
+        const status = watcher.getStatus();
+        // Also refresh vault stats since watcher may have added files
+        if (status.added > 0 || status.updated > 0) {
+          try { vault.open(); } catch (_) {}
+        }
+        json(res, { ...status, vaultStats: vault.stats() });
         return;
       }
 

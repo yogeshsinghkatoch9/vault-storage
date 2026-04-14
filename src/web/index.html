@@ -232,7 +232,6 @@
   <div class="top-left">
     <div class="logo"><span>v</span>ault</div>
     <div class="top-actions">
-      <a href="/fractal" title="Fractal explorer" style="font-size:10px;letter-spacing:2px;color:var(--text-dim);text-decoration:none;padding:6px 12px;border:1px solid var(--border);border-radius:8px;transition:all .2s">FRACTAL</a>
       <a href="/xray" title="Disk X-Ray scanner" style="font-size:10px;letter-spacing:2px;color:var(--text-dim);text-decoration:none;padding:6px 12px;border:1px solid var(--border);border-radius:8px;transition:all .2s">X-RAY</a>
       <button class="theme-toggle" id="themeToggle" title="Toggle theme" aria-label="Toggle dark/light theme">&#9790;</button>
     </div>
@@ -322,6 +321,18 @@
       <div class="section-hdr">extract</div>
       <button class="btn btn-extract" style="width:100%;margin-bottom:6px;min-height:44px" onclick="extractZip('')">download all as ZIP</button>
       <div style="font-size:9px;color:var(--text-ghost);text-align:center">preserves full folder structure</div>
+    </div>
+
+    <div>
+      <div class="section-hdr">auto-backup</div>
+      <div id="watchPanel">
+        <input class="scan-input" id="watchDir" placeholder="/path/to/watch" style="width:100%;font-size:11px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);margin-bottom:6px;font-family:inherit;outline:none">
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-extract" style="flex:1;min-height:38px" id="watchStartBtn" onclick="startWatch()">start watching</button>
+          <button class="btn btn-del" style="flex:1;min-height:38px;display:none" id="watchStopBtn" onclick="stopWatch()">stop</button>
+        </div>
+        <div id="watchStatus" style="font-size:9px;color:var(--muted);margin-top:6px;display:none"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -619,19 +630,6 @@ function renderFiles() {
     btnDel.className = 'btn btn-del';
     btnDel.textContent = 'del';
     btnDel.addEventListener('click', () => remove(f.path));
-    const btnFP = document.createElement('button');
-    btnFP.className = 'btn';
-    btnFP.textContent = 'DNA';
-    btnFP.title = 'View fractal fingerprint';
-    btnFP.style.cssText = 'border-color:rgba(200,100,255,.15);color:rgba(200,100,255,.4)';
-    btnFP.addEventListener('click', async () => {
-      try {
-        const res = await fetch('/api/fingerprint?path=' + encodeURIComponent(f.path));
-        const data = await res.json();
-        if (data.url) window.open(data.url, '_blank');
-      } catch(e) { toast('fingerprint error'); }
-    });
-    actions.appendChild(btnFP);
     actions.appendChild(btnExtract);
     actions.appendChild(btnDel);
 
@@ -1058,10 +1056,78 @@ document.addEventListener('keydown', e => {
 // ─── Theme toggle ───────────────────────────────────────────────────
 $('themeToggle').addEventListener('click', toggleTheme);
 
+// ─── Auto-backup watcher ────────────────────────────────────────────
+let watchPollTimer = null;
+
+async function startWatch() {
+  const dir = $('watchDir').value.trim();
+  if (!dir) { $('watchDir').focus(); return; }
+  try {
+    const res = await fetch('/api/watch/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dirs: [dir] }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      toast('watching: ' + dir);
+      $('watchStartBtn').style.display = 'none';
+      $('watchStopBtn').style.display = 'block';
+      $('watchStatus').style.display = 'block';
+      $('watchStatus').textContent = 'watching for changes...';
+      watchPollTimer = setInterval(pollWatch, 3000);
+    } else {
+      toast('watch error: ' + data.error);
+    }
+  } catch(e) { toast('watch failed: ' + e.message); }
+}
+
+async function stopWatch() {
+  try {
+    await fetch('/api/watch/stop', { method: 'POST' });
+    toast('auto-backup stopped');
+  } catch(e) {}
+  $('watchStartBtn').style.display = 'block';
+  $('watchStopBtn').style.display = 'none';
+  $('watchStatus').style.display = 'none';
+  if (watchPollTimer) { clearInterval(watchPollTimer); watchPollTimer = null; }
+  loadFiles(); loadStats();
+}
+
+async function pollWatch() {
+  try {
+    const res = await fetch('/api/watch/status');
+    const data = await res.json();
+    if (!data.running) { stopWatch(); return; }
+    $('watchStatus').textContent =
+      data.added + ' added, ' + data.updated + ' updated' +
+      (data.errors > 0 ? ', ' + data.errors + ' errors' : '') +
+      ' \u00B7 ' + data.watcherCount + ' dirs monitored';
+    if (data.added > 0 || data.updated > 0) { loadFiles(); loadStats(); }
+  } catch(e) {}
+}
+
+// Check if watcher is already running on page load
+async function checkWatch() {
+  try {
+    const res = await fetch('/api/watch/status');
+    const data = await res.json();
+    if (data.running) {
+      $('watchStartBtn').style.display = 'none';
+      $('watchStopBtn').style.display = 'block';
+      $('watchStatus').style.display = 'block';
+      $('watchDir').value = data.watchedDirs?.[0] || '';
+      watchPollTimer = setInterval(pollWatch, 3000);
+      pollWatch();
+    }
+  } catch(e) {}
+}
+
 // ─── Init ───────────────────────────────────────────────────────────
 initTheme();
 loadStats();
 loadFiles();
+checkWatch();
 </script>
 </body>
 </html>
