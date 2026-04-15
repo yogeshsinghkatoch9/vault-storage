@@ -3,6 +3,9 @@
   <p align="center"><strong>Free, open-source storage engine that saves you 60-90% disk space.</strong></p>
   <p align="center">Content-defined chunking &middot; Smart deduplication &middot; AES-256 encryption &middot; P2P sync &middot; Web UI</p>
   <p align="center">
+    <a href="https://vault-storage.onrender.com"><strong>Live Demo &rarr;</strong></a>
+  </p>
+  <p align="center">
     <a href="#install">Install</a> &middot;
     <a href="#why-vault">Why Vault</a> &middot;
     <a href="#benchmarks">Benchmarks</a> &middot;
