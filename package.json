@@ -2,7 +2,7 @@
   "name": "vault-storage",
   "version": "1.0.0",
   "description": "Content-addressable storage engine with CDC chunking, smart compression, dedup, encryption, P2P sync, and a web UI. Zero dependencies.",
-  "main": "src/engine.js",
+  "main": "bin/vault",
   "bin": {
     "vault": "bin/vault"
   },
