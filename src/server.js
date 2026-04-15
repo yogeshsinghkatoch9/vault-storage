@@ -128,7 +128,7 @@ const MANIFEST = JSON.stringify({
   ],
 });
 
-function startServer(vaultDir, port = 3777) {
+function startServer(vaultDir, port = process.env.PORT || 3777) {
   const vault = new Vault(vaultDir);
   const { Watcher } = require('./watcher');
   let watcher = null;

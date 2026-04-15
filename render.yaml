@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: vault-storage
+    runtime: node
+    plan: free
+    buildCommand: echo "No build needed"
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+    autoDeploy: true
